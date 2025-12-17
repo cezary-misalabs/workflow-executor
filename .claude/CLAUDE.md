@@ -8,36 +8,37 @@ workflow-executor is a Python project, potentially using the Abstra framework fo
 
 ## Development Setup
 
-This project uses standard Python tooling. Common dependency managers supported:
-- pip with requirements.txt
-- poetry with pyproject.toml
-- uv
-- pdm
-- pipenv
+This project uses **uv** for dependency management and virtual environment handling.
 
-Create a virtual environment before installing dependencies:
+Python version: 3.12 (specified in .python-version)
+
+Common commands:
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# or
-.venv\Scripts\activate  # Windows
+uv sync                  # Install dependencies and sync environment
+uv add <package>         # Add a new dependency
+uv add --dev <package>   # Add a development dependency
+uv remove <package>      # Remove a dependency
+uv run <command>         # Run a command in the project environment
+uv run python main.py    # Run the main script
+uv lock                  # Update lock file
+uv python install 3.12   # Install Python 3.12 if needed
 ```
 
 ## Testing
 
-Use pytest for running tests:
+Use pytest for running tests (run via uv):
 ```bash
-pytest                    # Run all tests
-pytest path/to/test.py   # Run specific test file
-pytest -k test_name      # Run specific test by name
-pytest -v                # Verbose output
+uv run pytest                    # Run all tests
+uv run pytest path/to/test.py   # Run specific test file
+uv run pytest -k test_name      # Run specific test by name
+uv run pytest -v                # Verbose output
 ```
 
 ## Code Quality
 
 - Type hints: Use type annotations for function signatures
-- Linting: ruff is configured (see .ruff_cache/ in .gitignore)
-- Formatting: Use ruff format or black for code formatting
+- Linting: Use `uv run ruff check` for linting
+- Formatting: Use `uv run ruff format` for code formatting
 
 ## Abstra Framework
 
