@@ -36,9 +36,19 @@ uv run pytest -v                # Verbose output
 
 ## Code Quality
 
-- Type hints: Use type annotations for function signatures
-- Linting: Use `uv run ruff check` for linting
-- Formatting: Use `uv run ruff format` for code formatting
+This project uses ruff (linting + formatting) and mypy (type checking).
+
+Commands:
+```bash
+uv run ruff format .        # Format code
+uv run ruff check .         # Lint code
+uv run ruff check --fix .   # Lint and auto-fix issues
+uv run mypy .               # Type check code
+```
+
+Configuration is in pyproject.toml:
+- ruff: Line length 100, Python 3.12 target
+- mypy: Strict mode enabled (disallow_untyped_defs=true)
 
 ## Abstra Framework
 
