@@ -50,6 +50,59 @@ Configuration is in pyproject.toml:
 - ruff: Line length 100, Python 3.12 target
 - mypy: Strict mode enabled (disallow_untyped_defs=true)
 
+## Workflow Execution
+
+This project uses **Prefect** for workflow orchestration and execution.
+
+### Project Structure
+
+```
+workflows/
+├── tasks/              # Individual task definitions
+│   ├── scraping.py    # Data and sentiment scraping
+│   ├── llm.py         # LLM processing
+│   ├── preprocessing.py  # Data cleaning
+│   └── prediction.py  # ML model prediction
+└── trading_bot.py     # Main workflow flows
+```
+
+### Running Workflows
+
+```bash
+# Run single-symbol trading bot
+uv run python run_trading_bot.py --symbol AAPL
+
+# Run multi-symbol trading (parallel)
+uv run python run_trading_bot.py --multi
+```
+
+### Prefect Server (Optional)
+
+For workflow monitoring and visualization:
+```bash
+# Start Prefect server
+uv run prefect server start
+
+# Server will be available at http://localhost:4200
+```
+
+### Key Concepts
+
+**Tasks** (`@task`): Atomic units of work
+- Automatic retries on failure
+- Support for parallel execution via `.submit()`
+- Built-in logging and state tracking
+
+**Flows** (`@flow`): Orchestrate tasks
+- Define execution order (parallel vs sequential)
+- Error handling and recovery
+- Observability
+
+**Parallel Execution**: Use `task.submit()` to run tasks concurrently
+**Sequential Execution**: Call tasks directly to run them in order
+
+See `examples/README.md` for detailed workflow patterns.
+
 ## Abstra Framework
 
 This project includes Abstra-specific configuration (.abstra/ directory is gitignored). Abstra is an AI-powered process automation framework. See https://abstra.io/docs for framework-specific documentation.
