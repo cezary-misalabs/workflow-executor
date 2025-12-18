@@ -36,18 +36,71 @@ src/workflow_executor/
 
 ### Architectural Principles
 
-**Dependency Rule**: Dependencies flow inward only (Domain ← Application ← Infrastructure)
-- Domain layer has zero external dependencies
-- Application layer depends only on domain
-- Infrastructure implements domain interfaces
+**Clean Architecture - The 10 Principles:**
+1. **Single Responsibility (SRP)** - Each module has one reason to change
+2. **Open-Closed (OCP)** - Open for extension, closed for modification
+3. **Interface Segregation (ISP)** - Minimal necessary interfaces only
+4. **Dependency Inversion (DIP)** - Depend on abstractions, not concretions
+5. **Release-Reuse Equivalence (REP)** - Reusable components are properly versioned
+6. **Common Closure (CCP)** - Group things that change together
+7. **Common Reuse (CRP)** - Don't depend on unused functionality
+8. **Acyclic Dependencies (ADP)** - No circular dependencies
+9. **Stable Dependencies (SDP)** - Depend on stable modules
+10. **Stable Abstractions (SAP)** - Abstract = stable
 
-**Protocol Abstraction**: All component communication via `IComponentCommunicator` interface
-- HTTP, gRPC, Ray, message queues supported
-- No hardcoded protocol assumptions in application layer
+**Dependency Rule**: Domain ← Application ← Infrastructure (inward only)
+- Domain: zero external dependencies
+- Application: depends only on domain
+- Infrastructure: implements domain interfaces
+- **Never import from outer layers in inner layers**
 
-**External Workflow Storage**: Client workflows stored externally via `IWorkflowRepository`
-- This repo is the framework; client workflows live in separate repos
-- Support for multiple backends (PostgreSQL, S3, MongoDB, Git)
+**Protocol Abstraction**: All communication via `IComponentCommunicator` interface
+- Supports HTTP, gRPC, Ray, message queues
+- No hardcoded protocols in application layer
+
+**External Storage**: Workflows stored via `IWorkflowRepository`
+- Framework only; client workflows in separate repos
+- Backends: PostgreSQL, S3, MongoDB, Git (infrastructure layer)
+
+## Design Best Practices
+
+**Core Patterns:**
+- **Dependency Injection**: Infrastructure provides dependencies via constructors, never self-instantiate
+- **Law of Demeter**: Talk only to direct dependencies, avoid `obj.getDep().getOther().call()`
+- **Polymorphism > Conditionals**: Use interfaces/inheritance instead of switch/if-else chains
+- **Encapsulation**: Hide internals, expose minimal public interfaces
+- **Separation of Concerns**: Isolate threading (Prefect) from business logic
+
+**Code Organization:**
+- **Single Responsibility**: One class = one concern. If multiple reasons to change, split it
+- **No Hybrid Structures**: Don't mix data + behavior (Pydantic = data, Services = behavior)
+- **Minimal State**: Fewer instance variables = less complexity
+- **Downward Flow**: High-level functions first, helpers below (read top-to-bottom like narrative)
+- **Function Proximity**: Related functions stay close together
+
+**SOLID Examples:**
+```python
+# ✅ SRP: Separate concerns
+class WorkflowExecutor:
+    def execute(self): ...
+class WorkflowRepository:
+    def save(self): ...
+
+# ✅ OCP: Extend via new implementations
+class GRPCCommunicator(IComponentCommunicator):
+    async def invoke(self): ...
+
+# ✅ DIP: Depend on abstractions
+class ExecuteWorkflow:
+    def __init__(self, communicator: IComponentCommunicator): ...
+```
+
+**Anti-Patterns (Avoid):**
+- Over-engineering (YAGNI), premature optimization (KISS)
+- Tight coupling, hardcoded dependencies
+- God objects (classes doing too much)
+- Circular dependencies
+- Scattered configuration (centralize in infrastructure layer)
 
 ## Development Setup
 
@@ -68,172 +121,65 @@ uv python install 3.12   # Install Python 3.12 if needed
 
 ## Testing
 
-Test structure follows the architecture layers:
-
 ```bash
-# Unit tests (isolated, fast)
-uv run pytest tests/unit/ -v
-uv run pytest tests/unit/domain/ -v       # Domain layer tests
-uv run pytest tests/unit/application/ -v  # Application layer tests
-uv run pytest tests/unit/infrastructure/ -v  # Infrastructure tests
-
-# Integration tests (component interactions)
-uv run pytest tests/integration/ -v
-
-# System tests (end-to-end)
-uv run pytest tests/system/ -v
-
-# All tests with coverage
-uv run pytest --cov=src/workflow_executor --cov-report=term --cov-report=xml
-
-# Specific test markers
-uv run pytest -m unit         # Run only unit tests
-uv run pytest -m integration  # Run only integration tests
-uv run pytest -m system       # Run only system tests
+uv run pytest tests/unit/ -v              # Unit (isolated, layer-specific)
+uv run pytest tests/integration/ -v       # Integration (component interactions)
+uv run pytest tests/system/ -v            # System (end-to-end)
+uv run pytest --cov=src/workflow_executor # All tests with coverage
+uv run pytest -m unit|integration|system  # By marker
 ```
 
 ## Code Quality
 
-This project uses ruff (linting + formatting) and mypy (type checking).
-
-Commands:
 ```bash
-uv run ruff format .        # Format code
-uv run ruff check .         # Lint code
-uv run ruff check --fix .   # Lint and auto-fix issues
-uv run mypy src/            # Type check code
+uv run ruff format .        # Format
+uv run ruff check .         # Lint
+uv run ruff check --fix .   # Auto-fix
+uv run mypy src/            # Type check (strict mode)
 ```
 
-Configuration in pyproject.toml:
-- **ruff**: Line length 100, Python 3.12 target
-- **mypy**: Strict mode enabled (disallow_untyped_defs=true, Pydantic plugin enabled)
-- **pytest**: Async support enabled, markers for unit/integration/system tests
+Config (pyproject.toml): ruff (line 100, Py3.12), mypy (strict), pytest (async, markers)
 
 ## CI/CD
 
-GitHub Actions workflow runs on push and PR:
-- Linting and formatting checks (ruff)
-- Type checking (mypy)
-- Tests on Python 3.12 and 3.13 (unit, integration, system)
-- Coverage reporting (Codecov)
-- Package build verification
+Runs on push/PR: ruff format/lint, mypy, tests (Py3.12), coverage (Codecov), build
 
 ## Examples
 
-Example workflows are in `examples/` directory (not part of framework package):
-
-```bash
-# Trading bot example (demonstrates sequential + parallel patterns)
-uv run python examples/trading_bot/run_trading_bot.py --symbol AAPL
-uv run python examples/trading_bot/run_trading_bot.py --multi
-```
+Trading bot demo: `uv run python examples/trading_bot/run_trading_bot.py --symbol AAPL`
 
 ## Workflow Patterns
 
-The framework supports multiple workflow patterns via templates:
+**Sequential**: `result1 = step1() → result2 = step2(result1) → result3 = step3(result2)`
 
-**Sequential Workflow**: Tasks execute in strict order
-```python
-# Each step waits for previous to complete
-result1 = step1()
-result2 = step2(result1)
-result3 = step3(result2)
-```
+**Parallel**: `future1/2 = task.submit() → merge(future1.result(), future2.result())`
 
-**Parallel Workflow**: Independent tasks run simultaneously
-```python
-# Tasks run in parallel, then merge results
-future1 = task1.submit()
-future2 = task2.submit()
-result = merge(future1.result(), future2.result())
-```
+**Event-Driven**: State machine with event transitions driving state changes
 
-**Event-Driven Workflow**: State machines with event transitions
-```python
-# Process moves between states based on events
-current_state = State.INITIAL
-while current_state != State.COMPLETE:
-    result = process_state(current_state)
-    current_state = determine_next_state(result)
-```
-
-**State-Machine Workflow**: Explicit state management with <7 states
-```python
-# Clear state transitions with defined logic
-state_machine = {
-    State.NEW: handle_new,
-    State.PROCESSING: handle_processing,
-    State.COMPLETE: handle_complete
-}
-```
+**State-Machine**: Explicit state management (<7 states) with handler mapping
 
 ## Prefect Best Practices
 
-**Tasks** (`@task`): Pure functions with clear inputs/outputs
-- Automatic retries on failure
-- Parallel execution via `.submit()`
-- No shared state modification
-- Idempotent operations
-
-**Flows** (`@flow`): Orchestration only, no business logic
-- Define execution order
-- Error handling and recovery
-- Never use `flow.submit()` (use ThreadPoolExecutor instead)
-
-**Parallel Execution**: Use `task.submit()` to run tasks concurrently
-**Sequential Execution**: Call tasks directly to run them in order
+**Tasks** (`@task`): Pure, idempotent functions. Auto-retry, parallel via `.submit()`, no shared state
+**Flows** (`@flow`): Orchestration only (no business logic). Never use `flow.submit()`
+**Parallel**: `task.submit()` | **Sequential**: Direct calls
 
 ## PyPI Distribution
 
-This package will be published as `workflow-executor`:
-
-```bash
-# Install
-pip install workflow-executor
-
-# Usage
-from workflow_executor.domain.entities import WorkflowDefinition
-from workflow_executor.infrastructure.communication import HTTPCommunicator
-from workflow_executor.infrastructure.execution import PrefectExecutor
-
-# Define workflow
-workflow = WorkflowDefinition(...)
-
-# Execute
-executor = PrefectExecutor(communicator=HTTPCommunicator())
-result = await executor.execute(workflow)
-```
+Package: `workflow-executor` (framework only, client workflows in separate repos)
 
 ## Code Completion Checklist
 
-**CRITICAL: Before considering ANY code changes complete, you MUST run and pass ALL of the following checks:**
+**CRITICAL: ALL checks must pass before considering work complete:**
 
 ```bash
-# 1. Format check
-uv run ruff format --check .
-
-# 2. Linting
-uv run ruff check .
-
-# 3. Type checking
-uv run mypy src/
-
-# 4. All tests
-uv run pytest tests/unit/ tests/integration/ tests/system/ -v
+uv run ruff format --check .                            # Format ✅
+uv run ruff check .                                     # Lint ✅
+uv run mypy src/                                        # Type check (strict) ✅
+uv run pytest tests/unit/ tests/integration/ tests/system/ -v  # All tests ✅
 ```
 
-**Required Standards:**
-- ✅ All ruff format checks must pass (no formatting issues)
-- ✅ All ruff linting checks must pass (zero violations)
-- ✅ All mypy type checks must pass (strict mode, zero errors)
-- ✅ All tests must pass (unit + integration + system)
-
-**If any check fails:**
-1. Fix the issues immediately
-2. Re-run all checks
-3. Only after ALL checks pass can you consider the work complete
-
-**Never skip these checks or consider work done with failing tests/linting/type errors.**
+**Never skip checks or consider work done with failing tests/linting/type errors.**
 
 ## Important Notes
 
