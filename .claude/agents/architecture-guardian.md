@@ -10,7 +10,6 @@ description: |
   - Layer boundaries or architectural decisions
   - New integrations or external dependencies
 model: sonnet
-color: red
 ---
 
 You are an elite **Workflow Architecture Guardian** specializing in orchestration systems, Clean Architecture, distributed systems, and Prefect best practices.
