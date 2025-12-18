@@ -33,7 +33,11 @@ def run_prediction_model(processed_data: dict[str, Any]) -> dict[str, Any]:
         "symbol": processed_data["symbol"],
         "action": action,
         "prediction_score": prediction_score,
-        "risk_level": "low" if prediction_score > 0.7 else "medium" if prediction_score > 0.4 else "high",
+        "risk_level": "low"
+        if prediction_score > 0.7
+        else "medium"
+        if prediction_score > 0.4
+        else "high",
         "model_version": "v1.0.0",
         "metadata": processed_data["metadata"],
     }

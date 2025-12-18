@@ -25,7 +25,9 @@ def extract_insights(market_data: dict[str, Any], sentiment_data: dict[str, Any]
         "symbol": market_data["symbol"],
         "overall_sentiment": combined_sentiment,
         "price_momentum": "bullish" if market_data["change"] > 0 else "bearish",
-        "recommendation": "buy" if combined_sentiment > 0.6 and market_data["change"] > 0 else "hold",
+        "recommendation": "buy"
+        if combined_sentiment > 0.6 and market_data["change"] > 0
+        else "hold",
         "confidence": 0.82,
         "reasoning": f"Strong positive sentiment ({combined_sentiment:.2f}) combined with "
         f"price momentum ({market_data['change']:.2f}%)",

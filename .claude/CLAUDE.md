@@ -204,6 +204,37 @@ executor = PrefectExecutor(communicator=HTTPCommunicator())
 result = await executor.execute(workflow)
 ```
 
+## Code Completion Checklist
+
+**CRITICAL: Before considering ANY code changes complete, you MUST run and pass ALL of the following checks:**
+
+```bash
+# 1. Format check
+uv run ruff format --check .
+
+# 2. Linting
+uv run ruff check .
+
+# 3. Type checking
+uv run mypy src/
+
+# 4. All tests
+uv run pytest tests/unit/ tests/integration/ tests/system/ -v
+```
+
+**Required Standards:**
+- ✅ All ruff format checks must pass (no formatting issues)
+- ✅ All ruff linting checks must pass (zero violations)
+- ✅ All mypy type checks must pass (strict mode, zero errors)
+- ✅ All tests must pass (unit + integration + system)
+
+**If any check fails:**
+1. Fix the issues immediately
+2. Re-run all checks
+3. Only after ALL checks pass can you consider the work complete
+
+**Never skip these checks or consider work done with failing tests/linting/type errors.**
+
 ## Important Notes
 
 - This is a **framework**, not an application. Client workflows live in separate repos.
