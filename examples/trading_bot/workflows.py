@@ -14,10 +14,10 @@ from typing import Any
 
 from prefect import flow
 
-from workflows.tasks.llm import extract_insights
-from workflows.tasks.prediction import execute_trade, run_prediction_model
-from workflows.tasks.preprocessing import clean_and_normalize
-from workflows.tasks.scraping import scrape_market_data, scrape_sentiment
+from examples.trading_bot.tasks.llm import extract_insights
+from examples.trading_bot.tasks.prediction import execute_trade, run_prediction_model
+from examples.trading_bot.tasks.preprocessing import clean_and_normalize
+from examples.trading_bot.tasks.scraping import scrape_market_data, scrape_sentiment
 
 
 @flow(name="trading-bot", log_prints=True)
