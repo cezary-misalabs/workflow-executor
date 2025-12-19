@@ -25,9 +25,9 @@ def run_inference(
         Inference result including question, answer, and metadata
     """
     # Construct full model ID (vendor/name) for vLLM
-    vendor = deployment.get("vendor", "")
+    #vendor = deployment.get("vendor", "")
     name = deployment.get("name", "unknown")
-    model_id = f"{vendor}/{name}" if vendor else name
+    model_id = name
 
     print(f"💬 Running inference on {model_id}...")
     print(f"   Question: {question[:80]}{'...' if len(question) > 80 else ''}")
@@ -35,18 +35,39 @@ def run_inference(
     endpoint_url = deployment["endpoint_url"]
     start_time = time.time()
 
-    # Use vLLM OpenAI-compatible API
-    response = httpx.post(
-        f"{endpoint_url}/v1/chat/completions",
-        json={
-            "model": model_id,
-            "messages": [{"role": "user", "content": question}],
-            "max_tokens": 512,
-            "temperature": 0.7,
-        },
-        timeout=120.0,
-    )
-    response.raise_for_status()
+    # Try both common OpenAI-compatible API paths
+    api_paths = [
+        "/v1/chat/completions",  # Standard path
+        "/openai/v1/chat/completions",  # Alternative path
+    ]
+
+    response = None
+    last_error = None
+
+    for api_path in api_paths:
+        try:
+            url = f"{endpoint_url}{api_path}"
+            print(f"   → Trying {api_path}...")
+            response = httpx.post(
+                url,
+                json={
+                    "model": model_id,
+                    "messages": [{"role": "user", "content": question}],
+                    "max_tokens": 512,
+                    "temperature": 0.7,
+                },
+                timeout=120.0,
+            )
+            response.raise_for_status()
+            print(f"   ✓ Using endpoint: {api_path}")
+            break
+        except httpx.HTTPError as e:
+            last_error = e
+            continue
+
+    if response is None:
+        raise last_error or httpx.HTTPError("No valid API endpoint found")
+
     result = response.json()
 
     # Extract answer from OpenAI-compatible response

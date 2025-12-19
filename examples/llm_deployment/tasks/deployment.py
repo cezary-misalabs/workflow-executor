@@ -3,6 +3,7 @@
 import time
 from typing import Any
 
+import httpx
 from prefect import task
 
 
@@ -30,22 +31,49 @@ def deploy_model(model: dict[str, Any]) -> dict[str, Any]:
 
     # Simulate deployment steps
     steps = [
-        ("Provisioning GPU instance", 1.0),
-        ("Pulling model weights", 1.5),
-        ("Starting inference server", 1.0),
-        ("Running health checks", 0.5),
+        ("Provisioning GPU instance", 0.1),
+        ("Pulling model weights", 0.1),
+        ("Starting inference server", 0.1),
+        ("Running health checks", 0.1),
     ]
 
     for step_name, duration in steps:
         print(f"   → {step_name}...")
         time.sleep(duration)
 
+    #deployed_endpoint = "http://localhost:7070"
+    deployed_endpoint = "http://52.91.14.233:11434"
+
+    # Fetch actual model name from the deployed endpoint
+    try:
+        response = httpx.get(
+            f"{deployed_endpoint}/v1/models",
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        models_data = response.json()
+        models_list = models_data.get("data", [])
+        if models_list:
+            deployed_model_id = models_list[0]["id"]
+            print(f"   → Deployed model: {deployed_model_id}")
+        else:
+            models_list = models_data.get("models", [])
+            if models_list:
+                deployed_model_id = models_list[0]
+                print(f"   → Deployed model: {deployed_model_id}")
+            else:
+                print("   ⚠ No models found in deployment response")
+                deployed_model_id = model["name"]
+    except (httpx.HTTPError, KeyError, IndexError) as e:
+        print(f"   ⚠ Could not fetch model from endpoint: {e}")
+        deployed_model_id = model["name"]
+
     # Hardcoded deployment endpoint for demo
     deployment = {
-        "name": model["name"],
-        "vendor": model.get("vendor", ""),
-        "endpoint_url": "http://52.91.14.233:11434",
-        "docs_url": "http://52.91.14.233:11434/docs",
+        "name": deployed_model_id,
+        #"vendor": model.get("vendor", ""),
+        "endpoint_url": deployed_endpoint,
+        "docs_url": f"{deployed_endpoint}docs",
         "status": "running",
         "instance_type": "g5.xlarge",
         "gpu": "NVIDIA A10G",
