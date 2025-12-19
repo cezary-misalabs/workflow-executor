@@ -119,25 +119,6 @@ uv lock                  # Update lock file
 uv python install 3.12   # Install Python 3.12 if needed
 ```
 
-## Testing & TDD
-
-**MANDATORY: Test-Driven Development (TDD)**
-- **Always write tests BEFORE implementation code**
-- Follow Red-Green-Refactor cycle:
-  1. **Red**: Write failing test first
-  2. **Green**: Write minimal code to pass
-  3. **Refactor**: Clean up while keeping tests green
-- Never write production code without a failing test first
-- Tests define the contract and expected behavior
-- Write tests that make sense and bring value
-
-```bash
-uv run pytest tests/unit/ -v              # Unit (isolated, layer-specific)
-uv run pytest tests/integration/ -v       # Integration (component interactions)
-uv run pytest tests/system/ -v            # System (end-to-end)
-uv run pytest --cov=src/workflow_executor # All tests with coverage
-uv run pytest -m unit|integration|system  # By marker
-```
 
 ## Code Quality
 
