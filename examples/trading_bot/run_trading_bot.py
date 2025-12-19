@@ -1,7 +1,8 @@
 """
 Entry point for running the trading bot example.
 
-This demonstrates how to execute workflows built with the workflow-executor framework.
+This demonstrates how to execute workflows built with the
+workflow-executor framework.
 
 Usage:
     # Single symbol trading
@@ -16,15 +17,21 @@ import sys
 from pathlib import Path
 
 # Add project root to Python path
+# ruff: noqa: E402
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from examples.trading_bot.workflows import multi_symbol_trading_flow, trading_bot_flow
+from examples.trading_bot.workflows import (
+    multi_symbol_trading_flow,
+    trading_bot_flow,
+)
 
 
 def main() -> None:
     """Run the trading bot workflow."""
-    parser = argparse.ArgumentParser(description="Run trading bot workflow example")
+    parser = argparse.ArgumentParser(
+        description="Run trading bot workflow example"
+    )
     parser.add_argument(
         "--symbol",
         type=str,
@@ -42,16 +49,21 @@ def main() -> None:
     if args.multi:
         # Run parallel workflows for multiple symbols
         symbols = ["AAPL", "TSLA", "GOOGL", "MSFT"]
-        print(f"\n🚀 Starting multi-symbol trading for: {', '.join(symbols)}\n")
+        symbols_str = ", ".join(symbols)
+        print(f"\n🚀 Starting multi-symbol trading for: {symbols_str}\n")
         result = multi_symbol_trading_flow(symbols)
         print("\n" + "=" * 60)
         print("📊 Multi-Symbol Trading Results:")
         print("=" * 60)
         for symbol, trade_result in result.items():
             if "error" in trade_result:
-                print(f"  {symbol}: ❌ {trade_result['status']} - {trade_result['error']}")
+                status = trade_result["status"]
+                error = trade_result["error"]
+                print(f"  {symbol}: ❌ {status} - {error}")
             else:
-                print(f"  {symbol}: ✅ {trade_result['action']} - {trade_result['trade_id']}")
+                action = trade_result["action"]
+                trade_id = trade_result["trade_id"]
+                print(f"  {symbol}: ✅ {action} - {trade_id}")
     else:
         # Run single symbol workflow
         print(f"\n🚀 Starting trading bot for {args.symbol}\n")
