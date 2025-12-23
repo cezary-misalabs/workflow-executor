@@ -1,5 +1,6 @@
 """Model deployment tasks - deploying models to inference endpoints."""
 
+import atexit
 import hashlib
 import os
 import secrets
@@ -13,6 +14,24 @@ from urllib.parse import urlparse
 import httpx
 from dotenv import load_dotenv
 from prefect import task
+
+# Global registry for port-forward processes
+# This allows us to track and clean up processes without returning them from tasks
+_PORT_FORWARD_PROCESSES: list[subprocess.Popen[bytes]] = []
+
+
+def _cleanup_port_forwards() -> None:
+    """Clean up all port-forward processes on exit."""
+    for process in _PORT_FORWARD_PROCESSES:
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except Exception:
+            pass
+
+
+# Register cleanup handler
+atexit.register(_cleanup_port_forwards)
 
 # Load environment variables from .env file for AWS/kubectl authentication
 env_file = Path(__file__).parent.parent.parent.parent / ".env"
@@ -209,20 +228,18 @@ def _find_available_port(start_port: int = 8000, max_attempts: int = 100) -> int
 
 def _setup_port_forward(
     k8s_service_name: str, internal_endpoint: str, local_port: int
-) -> subprocess.Popen[bytes]:
+) -> None:
     """
     Set up kubectl port-forward for internal cluster endpoint.
 
     This creates a background process that forwards traffic from localhost
-    to the internal cluster service.
+    to the internal cluster service. The process is registered in the global
+    registry for cleanup on exit.
 
     Args:
         k8s_service_name: Kubernetes service name (from model_info.model_name)
         internal_endpoint: Internal cluster endpoint URL
         local_port: Local port to forward to
-
-    Returns:
-        Popen process handle for the port-forward process
 
     Raises:
         RuntimeError: If port forwarding fails to start
@@ -273,8 +290,27 @@ def _setup_port_forward(
             )
             raise RuntimeError(f"Port forwarding failed to start: {stderr_output}")
 
-        print(f"   ✓ Port forward active on localhost:{local_port}")
-        return process
+        # Wait for port forward to be ready by attempting to connect
+        localhost_url = f"http://localhost:{local_port}"
+        max_retries = 15
+        for attempt in range(max_retries):
+            try:
+                # Try a simple connection test (just check if port accepts connections)
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(1)
+                    sock.connect(("127.0.0.1", local_port))
+                print(f"   ✓ Port forward ready on localhost:{local_port}")
+                break
+            except (socket.error, ConnectionRefusedError):
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                else:
+                    raise RuntimeError(
+                        f"Port forward started but endpoint not reachable after {max_retries} seconds"
+                    )
+        
+        # Register process for cleanup on exit
+        _PORT_FORWARD_PROCESSES.append(process)
 
     except FileNotFoundError as e:
         raise RuntimeError(
@@ -286,7 +322,7 @@ def _setup_port_forward(
 
 def _create_external_endpoint(
     deployment_info: dict[str, Any], internal_endpoint: str
-) -> dict[str, Any]:
+) -> str:
     """
     Create external access to an internal cluster endpoint via port forwarding.
 
@@ -295,7 +331,7 @@ def _create_external_endpoint(
         internal_endpoint: Internal cluster endpoint URL
 
     Returns:
-        Dictionary with external_endpoint and port_forward_process
+        External endpoint URL (localhost with forwarded port)
 
     Raises:
         ValueError: If model_name cannot be extracted from deployment_info
@@ -303,10 +339,7 @@ def _create_external_endpoint(
     # Check if endpoint is already localhost (no forwarding needed)
     parsed = urlparse(internal_endpoint)
     if parsed.hostname in ["localhost", "127.0.0.1"]:
-        return {
-            "external_endpoint": internal_endpoint,
-            "port_forward_process": None,
-        }
+        return internal_endpoint
 
     # Extract kubernetes service name from model_info
     model_info = deployment_info.get("model_info", {})
@@ -319,14 +352,10 @@ def _create_external_endpoint(
 
     # Find available local port and set up forwarding
     local_port = _find_available_port()
-    port_forward_process = _setup_port_forward(k8s_service_name, internal_endpoint, local_port)
+    _setup_port_forward(k8s_service_name, internal_endpoint, local_port)
 
     external_endpoint = f"http://localhost:{local_port}"
-
-    return {
-        "external_endpoint": external_endpoint,
-        "port_forward_process": port_forward_process,
-    }
+    return external_endpoint
 
 
 def _verify_deployment_endpoint(endpoint_url: str, fallback_model_name: str) -> str:
@@ -366,7 +395,7 @@ def _verify_deployment_endpoint(endpoint_url: str, fallback_model_name: str) -> 
     return deployed_model_id
 
 
-@task(name="find-running-deployment", retries=2, retry_delay_seconds=3)
+@task(name="find-running-deployment", retries=2, retry_delay_seconds=3, cache_policy=None)
 def find_running_deployment(model: dict[str, Any]) -> dict[str, Any] | None:
     """
     Check if the selected model is already deployed and running.
@@ -420,8 +449,7 @@ def find_running_deployment(model: dict[str, Any]) -> dict[str, Any] | None:
 
                     # Set up external access via port forwarding
                     try:
-                        external_info = _create_external_endpoint(deployment, internal_endpoint)
-                        external_endpoint = external_info["external_endpoint"]
+                        external_endpoint = _create_external_endpoint(deployment, internal_endpoint)
 
                         # Return deployment info in consistent format
                         return {
@@ -432,7 +460,6 @@ def find_running_deployment(model: dict[str, Any]) -> dict[str, Any] | None:
                             "status": "running",
                             "deployment_id": deployment_id,
                             "deployed_at": deployment.get("created_at", "unknown"),
-                            "port_forward_process": external_info["port_forward_process"],
                         }
 
                     except (RuntimeError, ValueError) as e:
@@ -449,7 +476,7 @@ def find_running_deployment(model: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
 
-@task(name="deploy-model", retries=2, retry_delay_seconds=5)
+@task(name="deploy-model", retries=2, retry_delay_seconds=5, cache_policy=None)
 def deploy_model(model: dict[str, Any]) -> dict[str, Any]:
     """
     Deploy the selected model to an inference endpoint.
@@ -489,18 +516,17 @@ def deploy_model(model: dict[str, Any]) -> dict[str, Any]:
             "model_name": unique_model_name,
         }
     }
-    external_info = _create_external_endpoint(deployment_info_for_forwarding, deployed_endpoint)
+    external_endpoint = _create_external_endpoint(deployment_info_for_forwarding, deployed_endpoint)
 
     # Return deployment information (verification will be done separately)
     deployment: dict[str, Any] = {
         "name": unique_model_name,  # Will be verified in separate step
-        "endpoint_url": external_info["external_endpoint"],
+        "endpoint_url": external_endpoint,
         "internal_endpoint_url": deployed_endpoint,
-        "docs_url": f"{external_info['external_endpoint']}/docs",
+        "docs_url": f"{external_endpoint}/docs",
         "status": "running",
         "deployment_id": deployment_id,
         "deployed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "port_forward_process": external_info["port_forward_process"],
     }
 
     print("   ✓ Deployment complete!")
