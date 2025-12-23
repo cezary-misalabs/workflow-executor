@@ -16,6 +16,8 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 kubectl port-forward svc/model-catalog-service 9090:80 -n staging &
-#kubectl port-forward svc/platform-postgres-postgresql-primary 5432:5432 -n postgres &
+kubectl port-forward svc/qwen-llm-predictor 7070:80 -n staging &
+kubectl port-forward svc/misalabs-deployer-service -n staging 8080:80 &
+kubectl port-forward svc/platform-postgres-postgresql-primary 5432:5432 -n postgres &
 
 wait
