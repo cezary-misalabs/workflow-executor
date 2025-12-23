@@ -29,9 +29,7 @@ from examples.trading_bot.workflows import (
 
 def main() -> None:
     """Run the trading bot workflow."""
-    parser = argparse.ArgumentParser(
-        description="Run trading bot workflow example"
-    )
+    parser = argparse.ArgumentParser(description="Run trading bot workflow example")
     parser.add_argument(
         "--symbol",
         type=str,
