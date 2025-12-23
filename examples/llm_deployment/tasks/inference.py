@@ -25,7 +25,7 @@ def run_inference(
         Inference result including question, answer, and metadata
     """
     # Construct full model ID (vendor/name) for vLLM
-    #vendor = deployment.get("vendor", "")
+    # vendor = deployment.get("vendor", "")
     name = deployment.get("name", "unknown")
     model_id = name
 

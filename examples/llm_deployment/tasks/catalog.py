@@ -1,6 +1,5 @@
 """Model catalog tasks - fetching and selecting models from the catalog service."""
 
-import time
 from typing import Any
 
 import httpx
@@ -30,7 +29,8 @@ def fetch_models(catalog_url: str = "http://localhost:9090") -> list[dict[str, A
         )
         response.raise_for_status()
         data = response.json()
-        models = data.get("models", [])
+        models_raw = data.get("models", [])
+        models: list[dict[str, Any]] = models_raw
         print(f"   ✓ Found {len(models)} models in catalog")
         return models
     except httpx.HTTPError as e:
@@ -39,32 +39,51 @@ def fetch_models(catalog_url: str = "http://localhost:9090") -> list[dict[str, A
 
 
 @task(name="select-recommended-model")
-def select_recommended_model(models: list[dict[str, Any]]) -> dict[str, Any]:
+def select_recommended_model(
+    models: list[dict[str, Any]], model_name: str | None = None
+) -> dict[str, Any]:
     """
     Select the recommended model from the catalog.
 
-    Searches for 'Llama-3.1-8B-Instruct' in the returned models list.
+    Searches for the specified model name in the returned models list.
+    Model names are matched in "vendor/name" format.
+    Defaults to 'Llama-3.1-8B-Instruct' if no model name is provided.
 
     Args:
         models: List of available models from catalog
+        model_name: Optional model name to select (default: Llama-3.1-8B-Instruct)
 
     Returns:
         The selected model definition
     """
     print("🎯 Selecting recommended model...")
 
-    target_model_name = "Llama-3.1-8B-Instruct"
+    target_model_name = model_name if model_name else "Llama-3.1-8B-Instruct"
 
-    # Find the model in the catalog
+    # Find the model in the catalog (match by vendor/name format)
     selected_model = None
     for model in models:
-        if model.get("name") == target_model_name:
+        vendor = model.get("vendor", "")
+        name = model.get("name", "")
+        full_model_name = f"{vendor}/{name}" if vendor else name
+
+        if full_model_name == target_model_name:
             selected_model = model
             break
 
     if selected_model is None:
-        raise ValueError(f"Model '{target_model_name}' not found in catalog. "
-                        f"Available models: {[m.get('name') for m in models]}")
+        # Build list of available models in vendor/name format for error message
+        available_models: list[str] = []
+        for m in models:
+            vendor = m.get("vendor", "")
+            name = m.get("name", "")
+            model_str = f"{vendor}/{name}" if vendor else name
+            available_models.append(model_str)
+
+        raise ValueError(
+            f"Model '{target_model_name}' not found in catalog. "
+            f"Available models: {available_models}"
+        )
 
     print(f"   ✓ Selected: {selected_model.get('name')}")
     print(f"   → Provider: {selected_model.get('provider', 'unknown')}")
