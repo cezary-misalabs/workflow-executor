@@ -226,9 +226,7 @@ def _find_available_port(start_port: int = 8000, max_attempts: int = 100) -> int
     raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_attempts}")
 
 
-def _setup_port_forward(
-    k8s_service_name: str, internal_endpoint: str, local_port: int
-) -> None:
+def _setup_port_forward(k8s_service_name: str, internal_endpoint: str, local_port: int) -> None:
     """
     Set up kubectl port-forward for internal cluster endpoint.
 
@@ -291,7 +289,6 @@ def _setup_port_forward(
             raise RuntimeError(f"Port forwarding failed to start: {stderr_output}")
 
         # Wait for port forward to be ready by attempting to connect
-        localhost_url = f"http://localhost:{local_port}"
         max_retries = 15
         for attempt in range(max_retries):
             try:
@@ -301,14 +298,15 @@ def _setup_port_forward(
                     sock.connect(("127.0.0.1", local_port))
                 print(f"   ✓ Port forward ready on localhost:{local_port}")
                 break
-            except (socket.error, ConnectionRefusedError):
+            except (OSError, ConnectionRefusedError):
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 else:
                     raise RuntimeError(
-                        f"Port forward started but endpoint not reachable after {max_retries} seconds"
-                    )
-        
+                        f"Port forward started but endpoint not reachable "
+                        f"after {max_retries} seconds"
+                    ) from None
+
         # Register process for cleanup on exit
         _PORT_FORWARD_PROCESSES.append(process)
 
@@ -320,9 +318,7 @@ def _setup_port_forward(
         raise RuntimeError(f"Failed to set up port forwarding: {e}") from e
 
 
-def _create_external_endpoint(
-    deployment_info: dict[str, Any], internal_endpoint: str
-) -> str:
+def _create_external_endpoint(deployment_info: dict[str, Any], internal_endpoint: str) -> str:
     """
     Create external access to an internal cluster endpoint via port forwarding.
 
