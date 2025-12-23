@@ -260,7 +260,15 @@ def _setup_port_forward(
 
         # Check if process is still running
         if process.poll() is not None:
-            stderr_output = process.stderr.read().decode() if process.stderr else ""
+            # Process has already terminated; safely collect stderr without race
+            stderr_output_bytes = b""
+            if process.stderr is not None:
+                try:
+                    _, stderr_output_bytes = process.communicate(timeout=0)
+                except Exception:
+                    # Fall back to empty stderr if communicate fails unexpectedly
+                    stderr_output_bytes = b""
+            stderr_output = stderr_output_bytes.decode(errors="replace") if stderr_output_bytes else ""
             raise RuntimeError(f"Port forwarding failed to start: {stderr_output}")
 
         print(f"   ✓ Port forward active on localhost:{local_port}")

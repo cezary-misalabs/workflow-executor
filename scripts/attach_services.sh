@@ -1,6 +1,9 @@
 #!/bin/bash
 
-# AWS Credentials - paste your own here
+# AWS credentials
+# WARNING: Do NOT paste real AWS credentials into this script or commit them to source control.
+# Prefer sourcing credentials from your environment, a .env file, or AWS CLI configuration (aws configure).
+# The values below are placeholders and should be overridden by your environment as needed.
 export AWS_ACCESS_KEY_ID="AWS_ACCESS_KEY_ID"
 export AWS_SECRET_ACCESS_KEY="AWS_SECRET_ACCESS_KEY"
 export AWS_SESSION_TOKEN="AWS_SESSION_TOKEN"
