@@ -268,7 +268,9 @@ def _setup_port_forward(
                 except Exception:
                     # Fall back to empty stderr if communicate fails unexpectedly
                     stderr_output_bytes = b""
-            stderr_output = stderr_output_bytes.decode(errors="replace") if stderr_output_bytes else ""
+            stderr_output = (
+                stderr_output_bytes.decode(errors="replace") if stderr_output_bytes else ""
+            )
             raise RuntimeError(f"Port forwarding failed to start: {stderr_output}")
 
         print(f"   ✓ Port forward active on localhost:{local_port}")
